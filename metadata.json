@@ -1,0 +1,5 @@
+{
+  "name": "Statistical Analysis Web Application",
+  "description": "An advanced web application for dataset upload, validation, descriptive statistics visualization, and OLS regression analysis with a focus on data privacy and user experience.",
+  "requestFramePermissions": []
+}
