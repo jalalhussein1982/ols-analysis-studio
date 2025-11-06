@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>OLS Analysis Studio - Plot Demo</title>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1200px;
+            margin: 50px auto;
+            padding: 20px;
+            background-color: #f5f5f5;
+        }
+        h1 {
+            color: #333;
+            text-align: center;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        .plot {
+            text-align: center;
+            margin: 20px 0;
+        }
+        img {
+            max-width: 100%;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            padding: 5px;
+        }
+        .success {
+            color: green;
+            font-weight: bold;
+        }
+        button {
+            background-color: #4CAF50;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+        }
+        button:hover {
+            background-color: #45a049;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>OLS Analysis Studio - Real Distribution Plots</h1>
+        <p class="success">✓ Backend is generating REAL data visualizations using matplotlib/seaborn!</p>
+        <p>These are actual statistical plots based on your <code>ols_demo_dataset.csv</code> data.</p>
+
+        <button onclick="fetchPlots()">Load Distribution Plots</button>
+
+        <div id="plots"></div>
+    </div>
+
+    <script>
+        async function fetchPlots() {
+            const session_token = "session_b2a495cf61ae4027b902dbb7e84a9f2c";
+
+            // First clean the data
+            await fetch(`http://localhost:8000/clean/${session_token}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ decisions: {} })
+            });
+
+            // Then fetch plots
+            const response = await fetch(`http://localhost:8000/plots/${session_token}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    variables: ["income", "experience_year", "age"]
+                })
+            });
+
+            const data = await response.json();
+            const plotsDiv = document.getElementById('plots');
+            plotsDiv.innerHTML = '<h2>Generated Plots:</h2>';
+
+            const varNames = ["Income", "Experience (Years)", "Age"];
+            data.plot_urls.forEach((url, index) => {
+                plotsDiv.innerHTML += `
+                    <div class="plot">
+                        <h3>${varNames[index]} Distribution</h3>
+                        <img src="${url}" alt="${varNames[index]} plot">
+                    </div>
+                `;
+            });
+        }
+    </script>
+</body>
+</html>

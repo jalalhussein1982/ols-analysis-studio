@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyScript Integration Test</title>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 20px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #0ea5e9; }
+        button {
+            background: #0ea5e9;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background: #0284c7; }
+        button:disabled {
+            background: #ccc;
+            cursor: not-allowed;
+        }
+        #output {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            margin-top: 20px;
+            max-height: 600px;
+            overflow-y: auto;
+        }
+        .log {
+            padding: 5px;
+            border-left: 3px solid #0ea5e9;
+            margin: 5px 0;
+            font-family: monospace;
+            font-size: 12px;
+        }
+        .error {
+            border-left-color: #dc2626;
+            background: #fee2e2;
+            color: #dc2626;
+        }
+        .success {
+            border-left-color: #16a34a;
+            background: #dcfce7;
+            color: #16a34a;
+        }
+        input[type="file"] {
+            margin: 10px 0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🔍 Integration Test: JavaScript ↔ Python</h1>
+        <p>This tests the API calls from JavaScript to Python functions.</p>
+
+        <div>
+            <input type="file" id="csvFile" accept=".csv">
+            <button onclick="testFullWorkflow()" id="testBtn" disabled>Run Full Workflow Test</button>
+        </div>
+
+        <div id="output">
+            <div class="log">Waiting for Python to load...</div>
+        </div>
+    </div>
+
+    <script>
+        let sessionToken = null;
+
+        function log(message, type = 'info') {
+            const output = document.getElementById('output');
+            const logDiv = document.createElement('div');
+            logDiv.className = `log ${type}`;
+            logDiv.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            output.appendChild(logDiv);
+            output.scrollTop = output.scrollHeight;
+        }
+
+        function checkPythonReady() {
+            if (window.pyAnalysisReady) {
+                log('✅ Python is ready!', 'success');
+                document.getElementById('testBtn').disabled = false;
+            } else {
+                setTimeout(checkPythonReady, 100);
+            }
+        }
+
+        async function testFullWorkflow() {
+            const fileInput = document.getElementById('csvFile');
+            const file = fileInput.files[0];
+
+            if (!file) {
+                log('❌ Please select a CSV file first', 'error');
+                return;
+            }
+
+            log('📂 Starting full workflow test...');
+
+            try {
+                // Step 1: Upload file
+                log('Step 1: Uploading file...');
+                const fileContent = await file.text();
+                const uploadResult = window.pyUploadFile(fileContent, file.name);
+                console.log('Upload result:', uploadResult);
+
+                sessionToken = uploadResult.session_token;
+                log(`✅ Upload successful! Session: ${sessionToken}`, 'success');
+                log(`   Columns: ${uploadResult.columns.join(', ')}`);
+                log(`   Rows: ${uploadResult.row_count}`);
+
+                // Step 2: Clean data
+                log('Step 2: Cleaning data...');
+                const cleanResult = window.pyCleanData(sessionToken, {});
+                console.log('Clean result:', cleanResult);
+                log(`✅ Clean successful!`, 'success');
+
+                // Step 3: Get descriptive stats
+                log('Step 3: Getting descriptive statistics...');
+                const depVar = uploadResult.columns[0];
+                const indepVars = uploadResult.columns.slice(1, 4);
+                log(`   Dependent: ${depVar}`);
+                log(`   Independent: ${indepVars.join(', ')}`);
+
+                const statsResult = window.pyGetDescriptiveStats(sessionToken, depVar, indepVars);
+                console.log('Stats result:', statsResult);
+
+                if (statsResult.error) {
+                    log(`❌ Stats error: ${statsResult.error}`, 'error');
+                } else {
+                    log(`✅ Stats calculated!`, 'success');
+                    Object.keys(statsResult).forEach(key => {
+                        log(`   ${key}: mean=${statsResult[key].mean.toFixed(2)}`);
+                    });
+                }
+
+                // Step 4: Generate plots
+                log('Step 4: Generating plots...');
+                const plotResult = window.pyGeneratePlots(sessionToken, [depVar, indepVars[0]]);
+                console.log('Plot result:', plotResult);
+
+                if (plotResult.error) {
+                    log(`❌ Plot error: ${plotResult.error}`, 'error');
+                } else {
+                    log(`✅ Plots generated! (${plotResult.plot_urls.length} plots)`, 'success');
+                }
+
+                // Step 5: Run OLS
+                log('Step 5: Running OLS regression...');
+                const olsResult = window.pyRunOlsAnalysis(sessionToken, depVar, indepVars, 'Test Model');
+                console.log('OLS result:', olsResult);
+
+                if (olsResult.error) {
+                    log(`❌ OLS error: ${olsResult.error}`, 'error');
+                } else {
+                    log(`✅ OLS completed! R²=${olsResult.r_squared.toFixed(4)}`, 'success');
+                    log(`   Adj R²=${olsResult.adj_r_squared.toFixed(4)}`);
+                }
+
+                log('🎉 Full workflow test completed!', 'success');
+
+            } catch (error) {
+                log(`❌ Error: ${error.message}`, 'error');
+                console.error('Full error:', error);
+            }
+        }
+
+        // Wait for Python
+        log('⏳ Loading Python runtime...');
+        checkPythonReady();
+    </script>
+
+    <!-- Load Python analysis module -->
+    <script type="py" config='{"packages": ["pandas", "numpy", "matplotlib", "scipy", "statsmodels"]}' src="/ols-analysis-studio/analysis.py?v=3"></script>
+</body>
+</html>

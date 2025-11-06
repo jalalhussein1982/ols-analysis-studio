@@ -1,102 +1,184 @@
 
 import { UploadResponse, CleaningDecisions, CleanDataResponse, DescriptiveStats, OlsResult, PlotResponse } from '../types';
 
-const MOCK_API_DELAY = 1000;
+// Extend window interface to include PyScript functions
+declare global {
+    interface Window {
+        pyAnalysisReady?: boolean;
+        pyUploadFile?: (fileContent: string, fileName: string) => any;
+        pyCleanData?: (sessionToken: string, decisions: any) => any;
+        pyGetDescriptiveStats?: (sessionToken: string, dependentVar: string, independentVars: string[]) => any;
+        pyGeneratePlots?: (sessionToken: string, variables: string[]) => any;
+        pyRunOlsAnalysis?: (sessionToken: string, dependentVar: string, independentVars: string[], modelName: string) => any;
+        pyEndSession?: (sessionToken: string) => any;
+    }
+}
 
-// Helper function to simulate network delay
-const delay = <T,>(data: T): Promise<T> => {
-    return new Promise(resolve => {
-        setTimeout(() => {
-            resolve(data);
-        }, MOCK_API_DELAY);
+// Wait for Python to be ready
+const waitForPython = (): Promise<void> => {
+    return new Promise((resolve) => {
+        if (window.pyAnalysisReady) {
+            resolve();
+        } else {
+            const checkInterval = setInterval(() => {
+                if (window.pyAnalysisReady) {
+                    clearInterval(checkInterval);
+                    resolve();
+                }
+            }, 100);
+        }
     });
 };
 
-export const uploadFile = (file: File): Promise<UploadResponse> => {
-    console.log(`Uploading file: ${file.name}`);
-    
-    const mockResponse: UploadResponse = {
-        session_token: `mock_session_${Date.now()}`,
-        columns: ['age', 'salary', 'years_experience', 'department', 'performance_score'],
-        validation_results: {
-            missing_data: { 'salary': 5, 'years_experience': 2 },
-            type_mismatches: { 'performance_score': [12, 45, 67] },
-            categorical_flags: ['department']
-        },
-        row_count: 1000,
-        preview: [
-            { 'age': 34, 'salary': 70000, 'years_experience': 10, 'department': 'Sales', 'performance_score': '8.5' },
-            { 'age': 45, 'salary': 95000, 'years_experience': 20, 'department': 'Engineering', 'performance_score': 9.2 },
-            { 'age': 28, 'salary': null, 'years_experience': 5, 'department': 'Marketing', 'performance_score': 7.8 },
-            { 'age': 52, 'salary': 120000, 'years_experience': 30, 'department': 'Sales', 'performance_score': 9.8 },
-            { 'age': 30, 'salary': 65000, 'years_experience': 7, 'department': 'Engineering', 'performance_score': 'err' },
-        ],
-    };
-    
-    return delay(mockResponse);
+// Helper to convert PyScript result to JavaScript object
+const convertPyResult = (pyResult: any): any => {
+    if (!pyResult) return null;
+
+    console.log('[JS] Converting Python result:', pyResult);
+
+    // If it's already a plain object, return it
+    if (typeof pyResult === 'object' && pyResult.constructor === Object) {
+        console.log('[JS] Already plain object');
+        return pyResult;
+    }
+
+    // Try to convert from Python proxy
+    try {
+        const converted = JSON.parse(JSON.stringify(pyResult));
+        console.log('[JS] Converted result:', converted);
+        return converted;
+    } catch (e) {
+        console.error('[JS] Conversion error:', e);
+        console.log('[JS] Returning raw result');
+        return pyResult;
+    }
 };
 
-export const cleanData = (sessionToken: string, decisions: CleaningDecisions): Promise<CleanDataResponse> => {
-    console.log(`Cleaning data for session ${sessionToken} with decisions:`, decisions);
-    
-    const mockResponse: CleanDataResponse = {
-        columns: ['age', 'salary', 'years_experience', 'performance_score'],
-        preview: [
-            { 'age': 34, 'salary': 70000, 'years_experience': 10, 'performance_score': 8.5 },
-            { 'age': 45, 'salary': 95000, 'years_experience': 20, 'performance_score': 9.2 },
-            { 'age': 28, 'salary': 85000, 'years_experience': 5, 'performance_score': 7.8 }, // Imputed
-            { 'age': 52, 'salary': 120000, 'years_experience': 30, 'performance_score': 9.8 },
-            { 'age': 30, 'salary': 65000, 'years_experience': 7, 'performance_score': 8.2 }, // Converted
-        ],
-    };
+export const uploadFile = async (file: File): Promise<UploadResponse> => {
+    await waitForPython();
 
-    return delay(mockResponse);
+    // Read file content
+    const fileContent = await file.text();
+
+    if (!window.pyUploadFile) {
+        throw new Error('Python analysis module not loaded');
+    }
+
+    const result = window.pyUploadFile(fileContent, file.name);
+    const jsResult = convertPyResult(result);
+
+    if (jsResult.error) {
+        throw new Error(jsResult.error);
+    }
+
+    return jsResult as UploadResponse;
 };
 
-export const getDescriptiveStats = (sessionToken: string, dependentVar: string, independentVars: string[]): Promise<DescriptiveStats> => {
-    console.log('Getting descriptive stats for:', { dependentVar, independentVars });
+export const cleanData = async (sessionToken: string, decisions: CleaningDecisions): Promise<CleanDataResponse> => {
+    await waitForPython();
 
-    const mockStats: DescriptiveStats = {
-        [dependentVar]: { mean: 85000, median: 82000, std_dev: 15000, min: 45000, max: 250000, skewness: 0.8, kurtosis: 1.2, outliers_count: 15 },
-        ...independentVars.reduce((acc, v) => ({
-            ...acc,
-            [v]: { mean: 40 + Math.random()*10, median: 38 + Math.random()*10, std_dev: 8 + Math.random()*5, min: 22, max: 65, skewness: 0.2, kurtosis: -0.1, outliers_count: 5 }
-        }), {})
-    };
+    if (!window.pyCleanData) {
+        throw new Error('Python analysis module not loaded');
+    }
 
-    return delay(mockStats);
+    const result = window.pyCleanData(sessionToken, decisions);
+    const jsResult = convertPyResult(result);
+
+    if (jsResult.error) {
+        throw new Error(jsResult.error);
+    }
+
+    return jsResult as CleanDataResponse;
 };
 
-export const generatePlots = (sessionToken: string, variables: string[]): Promise<PlotResponse> => {
-    console.log('Generating plots for variables:', variables);
-    const plot_urls = variables.map((_, i) => `https://picsum.photos/seed/${Date.now() + i}/600/400`);
-    return delay({ plot_urls });
+export const getDescriptiveStats = async (sessionToken: string, dependentVar: string, independentVars: string[]): Promise<DescriptiveStats> => {
+    await waitForPython();
+
+    console.log('[JS] getDescriptiveStats called with:', { sessionToken, dependentVar, independentVars });
+
+    if (!window.pyGetDescriptiveStats) {
+        throw new Error('Python analysis module not loaded');
+    }
+
+    try {
+        const result = window.pyGetDescriptiveStats(sessionToken, dependentVar, independentVars);
+        const jsResult = convertPyResult(result);
+
+        if (jsResult?.error) {
+            console.error('[JS] Python error in getDescriptiveStats:', jsResult.error);
+            throw new Error(jsResult.error);
+        }
+
+        return jsResult as DescriptiveStats;
+    } catch (error) {
+        console.error('[JS] Exception in getDescriptiveStats:', error);
+        throw error;
+    }
 };
 
-export const runOlsAnalysis = (sessionToken: string, dependentVar: string, independentVars: string[], modelName: string): Promise<OlsResult> => {
-    console.log('Running OLS:', { dependentVar, independentVars, modelName });
-    
-    const mockResult: OlsResult = {
-        model_name: modelName,
-        coefficients: {
-            'const': { coefficient: 25000, std_error: 5000, t_statistic: 5, p_value: 0.0001 },
-            ...independentVars.reduce((acc, v) => ({
-                ...acc,
-                [v]: { coefficient: Math.random() * 2000, std_error: Math.random() * 500, t_statistic: 4 + Math.random(), p_value: Math.random() * 0.05 }
-            }), {})
-        },
-        r_squared: 0.78 + Math.random() * 0.1,
-        adj_r_squared: 0.77 + Math.random() * 0.1,
-        f_statistic: 125.4 + Math.random() * 20,
-        f_p_value: 0.00001,
-        warnings: Math.random() > 0.7 ? ['High multicollinearity detected (Condition Number: 55.4). Results may be unreliable.'] : []
-    };
+export const generatePlots = async (sessionToken: string, variables: string[]): Promise<PlotResponse> => {
+    await waitForPython();
 
-    return delay(mockResult);
+    console.log('[JS] generatePlots called with:', { sessionToken, variables });
+
+    if (!window.pyGeneratePlots) {
+        throw new Error('Python analysis module not loaded');
+    }
+
+    try {
+        const result = window.pyGeneratePlots(sessionToken, variables);
+        const jsResult = convertPyResult(result);
+
+        if (jsResult?.error) {
+            console.error('[JS] Python error in generatePlots:', jsResult.error);
+            throw new Error(jsResult.error);
+        }
+
+        return jsResult as PlotResponse;
+    } catch (error) {
+        console.error('[JS] Exception in generatePlots:', error);
+        throw error;
+    }
 };
 
-export const endSession = (sessionToken: string): Promise<{ status: string }> => {
-    console.log(`Ending session: ${sessionToken}`);
-    // In a real app, this would trigger backend cleanup
-    return delay({ status: 'Session deleted successfully' });
+export const runOlsAnalysis = async (sessionToken: string, dependentVar: string, independentVars: string[], modelName: string): Promise<OlsResult> => {
+    await waitForPython();
+
+    console.log('[JS] runOlsAnalysis called with:', { sessionToken, dependentVar, independentVars, modelName });
+
+    if (!window.pyRunOlsAnalysis) {
+        throw new Error('Python analysis module not loaded');
+    }
+
+    try {
+        const result = window.pyRunOlsAnalysis(sessionToken, dependentVar, independentVars, modelName);
+        const jsResult = convertPyResult(result);
+
+        if (jsResult?.error) {
+            console.error('[JS] Python error in runOlsAnalysis:', jsResult.error);
+            throw new Error(jsResult.error);
+        }
+
+        return jsResult as OlsResult;
+    } catch (error) {
+        console.error('[JS] Exception in runOlsAnalysis:', error);
+        throw error;
+    }
+};
+
+export const endSession = async (sessionToken: string): Promise<{ status: string }> => {
+    await waitForPython();
+
+    if (!window.pyEndSession) {
+        throw new Error('Python analysis module not loaded');
+    }
+
+    const result = window.pyEndSession(sessionToken);
+    const jsResult = convertPyResult(result);
+
+    if (jsResult.error) {
+        throw new Error(jsResult.error);
+    }
+
+    return jsResult as { status: string };
 };

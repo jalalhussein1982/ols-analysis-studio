@@ -21,6 +21,10 @@
             }
         }
     </script>
+
+    <!-- PyScript -->
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
 <script type="importmap">
 {
   "imports": {
@@ -34,6 +38,10 @@
 </head>
 <body class="bg-slate-50 text-slate-800">
     <div id="root"></div>
+
+    <!-- PyScript Configuration -->
+    <script type="py" config='{"packages": ["pandas", "numpy", "matplotlib", "scipy", "statsmodels"]}' src="/analysis.py?v=4"></script>
+
     <script type="module" src="/index.tsx"></script>
 </body>
 </html>

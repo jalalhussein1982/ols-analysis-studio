@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PyScript Test - OLS Analysis Studio</title>
+    <link rel="stylesheet" href="https://pyscript.net/releases/2024.1.1/core.css">
+    <script type="module" src="https://pyscript.net/releases/2024.1.1/core.js"></script>
+    <style>
+        body {
+            font-family: Arial, sans-serif;
+            max-width: 1000px;
+            margin: 50px auto;
+            padding: 20px;
+            background: #f5f5f5;
+        }
+        .container {
+            background: white;
+            padding: 30px;
+            border-radius: 8px;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.1);
+        }
+        h1 { color: #0ea5e9; }
+        .status {
+            padding: 10px;
+            margin: 10px 0;
+            border-radius: 4px;
+            font-weight: bold;
+        }
+        .success { background: #d4edda; color: #155724; }
+        .error { background: #f8d7da; color: #721c24; }
+        .info { background: #d1ecf1; color: #0c5460; }
+        .warning { background: #fff3cd; color: #856404; }
+        pre {
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 4px;
+            overflow-x: auto;
+        }
+        button {
+            background: #0ea5e9;
+            color: white;
+            padding: 10px 20px;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            margin: 10px 5px;
+        }
+        button:hover { background: #0284c7; }
+        #output { margin-top: 20px; }
+        .test-section {
+            margin: 20px 0;
+            padding: 15px;
+            border-left: 4px solid #0ea5e9;
+            background: #f8f9fa;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🐍 PyScript Test Suite</h1>
+        <p>Testing if Python is running in your browser...</p>
+
+        <div id="loading" class="status info">
+            ⏳ Loading Python runtime and libraries (pandas, numpy, matplotlib, statsmodels)...<br>
+            This may take 5-10 seconds on first load.
+        </div>
+
+        <div id="status"></div>
+        <div id="output"></div>
+
+        <div class="test-section">
+            <h3>📊 Test with Your Dataset</h3>
+            <p>Upload your CSV file to test the complete analysis pipeline:</p>
+            <input type="file" id="csvFile" accept=".csv">
+            <button onclick="testDatasetUpload()">Test Upload & Analysis</button>
+        </div>
+
+        <div id="results"></div>
+    </div>
+
+    <script type="py" config='{"packages": ["pandas", "numpy", "matplotlib", "scipy", "statsmodels"]}'>
+import pandas as pd
+import numpy as np
+import matplotlib
+matplotlib.use('module://matplotlib_pyodide.html5_canvas_backend')
+import matplotlib.pyplot as plt
+import statsmodels.api as sm
+from scipy import stats
+import io
+import base64
+from js import document, console
+from pyodide.ffi import create_proxy
+
+def update_status(message, status_type="success"):
+    """Update status div with message"""
+    status_div = document.getElementById("status")
+    status_div.className = f"status {status_type}"
+    status_div.innerHTML = message
+
+def add_output(message):
+    """Add output message"""
+    output_div = document.getElementById("output")
+    output_div.innerHTML += f"<pre>{message}</pre>"
+
+try:
+    # Test 1: Basic Python
+    console.log("Test 1: Python is running!")
+    add_output("✅ Test 1: Python runtime loaded successfully")
+
+    # Test 2: NumPy
+    arr = np.array([1, 2, 3, 4, 5])
+    add_output(f"✅ Test 2: NumPy working - Created array: {arr}")
+
+    # Test 3: Pandas
+    df = pd.DataFrame({
+        'A': [1, 2, 3, 4, 5],
+        'B': [10, 20, 30, 40, 50]
+    })
+    add_output(f"✅ Test 3: Pandas working - Created DataFrame:\n{df.to_string()}")
+
+    # Test 4: Matplotlib
+    fig, ax = plt.subplots(figsize=(6, 4))
+    ax.plot([1, 2, 3, 4], [1, 4, 2, 3])
+    ax.set_title('Test Plot')
+    buffer = io.BytesIO()
+    plt.savefig(buffer, format='png')
+    buffer.seek(0)
+    img_data = base64.b64encode(buffer.read()).decode()
+    plt.close()
+    add_output(f"✅ Test 4: Matplotlib working - Generated plot ({len(img_data)} bytes)")
+
+    # Test 5: SciPy
+    from scipy import stats as sp_stats
+    t_stat, p_value = sp_stats.ttest_1samp([1, 2, 3, 4, 5], 3)
+    add_output(f"✅ Test 5: SciPy working - T-test result: t={t_stat:.4f}, p={p_value:.4f}")
+
+    # Test 6: Statsmodels OLS
+    X = np.array([[1, 2], [1, 3], [1, 4], [1, 5]])
+    y = np.array([2, 4, 5, 4])
+    model = sm.OLS(y, X)
+    results = model.fit()
+    add_output(f"✅ Test 6: Statsmodels working - OLS R²={results.rsquared:.4f}")
+
+    # Hide loading message
+    loading_div = document.getElementById("loading")
+    loading_div.style.display = "none"
+
+    update_status("🎉 All tests passed! Python is running perfectly in your browser!", "success")
+
+except Exception as e:
+    update_status(f"❌ Error: {str(e)}", "error")
+    add_output(f"Error details: {str(e)}")
+
+# Function to test file upload
+def test_upload_handler(event):
+    """Test uploading a CSV file"""
+    file = event.target.files.item(0)
+    if not file:
+        return
+
+    results_div = document.getElementById("results")
+    results_div.innerHTML = "<div class='status info'>⏳ Processing file...</div>"
+
+    # Read file
+    def on_load(e):
+        try:
+            content = e.target.result
+
+            # Parse CSV
+            df = pd.read_csv(io.StringIO(content))
+
+            output = f"<div class='status success'>✅ File loaded successfully!</div>"
+            output += f"<h3>Dataset Info:</h3>"
+            output += f"<pre>Shape: {df.shape[0]} rows × {df.shape[1]} columns\n"
+            output += f"Columns: {', '.join(df.columns)}\n\n"
+            output += f"First 5 rows:\n{df.head().to_string()}\n\n"
+
+            # Basic statistics
+            output += f"Descriptive Statistics:\n{df.describe().to_string()}</pre>"
+
+            # Try OLS if enough numeric columns
+            numeric_cols = df.select_dtypes(include=[np.number]).columns.tolist()
+            if len(numeric_cols) >= 2:
+                y = df[numeric_cols[0]]
+                X = sm.add_constant(df[numeric_cols[1:min(4, len(numeric_cols))]])
+
+                model = sm.OLS(y, X)
+                results = model.fit()
+
+                output += f"<h3>OLS Regression Test:</h3>"
+                output += f"<pre>Dependent: {numeric_cols[0]}\n"
+                output += f"Independent: {', '.join(numeric_cols[1:min(4, len(numeric_cols))])}\n\n"
+                output += f"R-squared: {results.rsquared:.4f}\n"
+                output += f"Adj. R-squared: {results.rsquared_adj:.4f}\n"
+                output += f"F-statistic: {results.fvalue:.2f}\n"
+                output += f"P-value: {results.f_pvalue:.6f}</pre>"
+
+                output += "<div class='status success'>🎉 Complete analysis pipeline working!</div>"
+
+            results_div.innerHTML = output
+
+        except Exception as ex:
+            results_div.innerHTML = f"<div class='status error'>❌ Error: {str(ex)}</div>"
+
+    reader = file.text()
+    reader.then(on_load)
+
+# Attach file upload handler
+file_input = document.getElementById("csvFile")
+file_input.addEventListener("change", create_proxy(test_upload_handler))
+
+    </script>
+</body>
+</html>

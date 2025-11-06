@@ -74,10 +74,25 @@ const AnalysisStep: React.FC<AnalysisStepProps> = ({ sessionToken, cleanedData }
 
     const renderTabs = () => (
         <div className="border-b border-slate-200">
-            <nav className="-mb-px flex space-x-8" aria-label="Tabs">
-                <button onClick={() => setActiveTab('stats')} className={`${activeTab === 'stats' ? 'border-brand-DEFAULT text-brand-dark' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Descriptive Stats</button>
-                <button onClick={() => setActiveTab('plots')} className={`${activeTab === 'plots' ? 'border-brand-DEFAULT text-brand-dark' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>Distribution Plots</button>
-                <button onClick={() => setActiveTab('ols')} className={`${activeTab === 'ols' ? 'border-brand-DEFAULT text-brand-dark' : 'border-transparent text-slate-500 hover:text-slate-700 hover:border-slate-300'} whitespace-nowrap py-4 px-1 border-b-2 font-medium text-sm`}>OLS Models</button>
+            <nav className="-mb-px flex space-x-2" aria-label="Tabs">
+                <button
+                    onClick={() => setActiveTab('stats')}
+                    className={`${activeTab === 'stats' ? 'border-brand-DEFAULT text-brand-dark bg-brand-light' : 'border-transparent text-slate-700 hover:text-brand-dark hover:bg-slate-100 hover:border-slate-300'} whitespace-nowrap py-3 px-4 border-b-2 font-semibold text-sm transition-colors rounded-t-md`}
+                >
+                    Descriptive Stats
+                </button>
+                <button
+                    onClick={() => setActiveTab('plots')}
+                    className={`${activeTab === 'plots' ? 'border-brand-DEFAULT text-brand-dark bg-brand-light' : 'border-transparent text-slate-700 hover:text-brand-dark hover:bg-slate-100 hover:border-slate-300'} whitespace-nowrap py-3 px-4 border-b-2 font-semibold text-sm transition-colors rounded-t-md`}
+                >
+                    Distribution Plots
+                </button>
+                <button
+                    onClick={() => setActiveTab('ols')}
+                    className={`${activeTab === 'ols' ? 'border-brand-DEFAULT text-brand-dark bg-brand-light' : 'border-transparent text-slate-700 hover:text-brand-dark hover:bg-slate-100 hover:border-slate-300'} whitespace-nowrap py-3 px-4 border-b-2 font-semibold text-sm transition-colors rounded-t-md`}
+                >
+                    OLS Models
+                </button>
             </nav>
         </div>
     );
@@ -170,19 +185,66 @@ const DescriptiveStatsView: React.FC<{ stats: DescriptiveStats }> = ({ stats }) 
 );
 
 
-const PlotsView: React.FC<{ plots: PlotResponse | null }> = ({ plots }) => (
-     <div>
-        <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold">Distribution Plots</h3>
-            <Button variant="secondary" icon={<DownloadIcon className="w-4 h-4" />}>Export PDF</Button>
-        </div>
-        {plots ? (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {plots.plot_urls.map((url, i) => <img key={i} src={url} alt={`Distribution plot ${i+1}`} className="rounded-md shadow-sm"/>)}
+const PlotsView: React.FC<{ plots: PlotResponse | null }> = ({ plots }) => {
+    const [selectedPlot, setSelectedPlot] = useState<string | null>(null);
+
+    // Handle escape key to close modal
+    React.useEffect(() => {
+        const handleEscape = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') setSelectedPlot(null);
+        };
+        if (selectedPlot) {
+            document.addEventListener('keydown', handleEscape);
+            return () => document.removeEventListener('keydown', handleEscape);
+        }
+    }, [selectedPlot]);
+
+    return (
+        <div>
+            <div className="flex justify-between items-center mb-4">
+                <h3 className="text-lg font-semibold">Distribution Plots</h3>
+                <Button variant="secondary" icon={<DownloadIcon className="w-4 h-4" />}>Export PDF</Button>
             </div>
-        ) : <p className="text-slate-500">No plots available.</p>}
-    </div>
-);
+            {plots ? (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {plots.plot_urls.map((url, i) => (
+                        <img
+                            key={i}
+                            src={url}
+                            alt={`Distribution plot ${i+1}`}
+                            className="rounded-md shadow-sm cursor-pointer hover:shadow-lg transition-shadow duration-200 hover:scale-[1.02]"
+                            onClick={() => setSelectedPlot(url)}
+                            title="Click to enlarge"
+                        />
+                    ))}
+                </div>
+            ) : <p className="text-slate-500">No plots available.</p>}
+
+            {/* Image Modal */}
+            {selectedPlot && (
+                <div
+                    className="fixed inset-0 bg-black bg-opacity-80 z-50 flex justify-center items-center p-4"
+                    onClick={() => setSelectedPlot(null)}
+                >
+                    <div className="relative max-w-7xl max-h-[95vh] flex flex-col">
+                        <button
+                            onClick={() => setSelectedPlot(null)}
+                            className="absolute -top-10 right-0 text-white hover:text-slate-300 text-2xl font-bold"
+                        >
+                            ✕
+                        </button>
+                        <img
+                            src={selectedPlot}
+                            alt="Enlarged plot"
+                            className="max-w-full max-h-[95vh] object-contain rounded-lg"
+                            onClick={(e) => e.stopPropagation()}
+                        />
+                    </div>
+                </div>
+            )}
+        </div>
+    );
+};
 
 
 const OlsView: React.FC<{ models: OlsResult[], activeModel: OlsResult | null, setActiveModel: (model: OlsResult) => void }> = ({ models, activeModel, setActiveModel }) => (
