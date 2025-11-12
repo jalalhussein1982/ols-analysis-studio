@@ -132,33 +132,62 @@ const App: React.FC = () => {
     // Show loading screen while Python libraries are loading
     if (!pythonReady) {
         return (
-            <div className="fixed inset-0 bg-gradient-to-br from-slate-800 via-slate-900 to-slate-950 flex flex-col items-center justify-center">
-                <div className="text-center space-y-6 max-w-md px-6">
-                    <div className="w-20 h-20 bg-brand-DEFAULT rounded-full flex items-center justify-center text-white font-bold text-4xl mx-auto shadow-lg shadow-brand-DEFAULT/50">
-                        S
-                    </div>
-                    <h1 className="text-3xl font-bold text-white">Statistical Analyzer</h1>
-                    <div className="space-y-3">
-                        <Spinner size="lg" />
-                        <p className="text-white text-lg font-medium">Loading Python libraries...</p>
-                        <div className="text-sm text-slate-300 space-y-1">
-                            <p>• pandas</p>
-                            <p>• numpy</p>
-                            <p>• matplotlib</p>
-                            <p>• scipy</p>
-                            <p>• statsmodels</p>
-                        </div>
-                    </div>
+            <div className="fixed inset-0 bg-white flex flex-col items-center justify-center">
+                <div className="text-center space-y-8 max-w-2xl px-6">
+                    {/* Title */}
                     <div className="space-y-2">
-                        <div className="w-full bg-slate-600 rounded-full h-4 overflow-hidden shadow-inner">
+                        <h1 className="text-4xl font-bold text-slate-800">OLS Statistical Analyzer</h1>
+                        <p className="text-slate-600 text-lg">Initializing Analysis Environment</p>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="space-y-3 w-full">
+                        <div className="w-full bg-slate-200 rounded-full h-3 overflow-hidden">
                             <div
-                                className="h-full bg-gradient-to-r from-brand-DEFAULT to-sky-400 transition-all duration-300 ease-out shadow-lg"
+                                className="h-full bg-blue-600 transition-all duration-300 ease-out"
                                 style={{ width: `${loadingProgress}%` }}
                             ></div>
                         </div>
-                        <p className="text-white text-lg font-bold">{Math.round(loadingProgress)}%</p>
+                        <p className="text-slate-700 text-xl font-semibold">{Math.round(loadingProgress)}%</p>
                     </div>
-                    <p className="text-slate-400 text-sm">This may take a few moments on first load...</p>
+
+                    {/* Loading message */}
+                    <div className="space-y-3">
+                        <p className="text-slate-700 text-base font-medium">Loading Python Libraries...</p>
+
+                        {/* Library list */}
+                        <div className="bg-slate-50 rounded-lg p-6 border border-slate-200">
+                            <div className="grid grid-cols-2 gap-x-8 gap-y-3 text-left">
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                                    <span className="text-slate-700 font-medium">pandas</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                                    <span className="text-slate-700 font-medium">numpy</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                                    <span className="text-slate-700 font-medium">matplotlib</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                                    <span className="text-slate-700 font-medium">scipy</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                                    <span className="text-slate-700 font-medium">statsmodels</span>
+                                </div>
+                                <div className="flex items-center space-x-2">
+                                    <div className="w-2 h-2 bg-blue-600 rounded-full"></div>
+                                    <span className="text-slate-700 font-medium">seaborn</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Footer message */}
+                    <p className="text-slate-500 text-sm">This may take a few moments on first load...</p>
                 </div>
             </div>
         );

@@ -9,6 +9,8 @@ import Table from './ui/Table';
 import Spinner from './ui/Spinner';
 import Tooltip from './ui/Tooltip';
 import { InfoIcon, DownloadIcon, AlertTriangleIcon } from './icons';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
 
 interface AnalysisStepProps {
     sessionToken: string;
@@ -77,19 +79,19 @@ const AnalysisStep: React.FC<AnalysisStepProps> = ({ sessionToken, cleanedData }
             <nav className="-mb-px flex space-x-2" aria-label="Tabs">
                 <button
                     onClick={() => setActiveTab('stats')}
-                    className={`${activeTab === 'stats' ? 'border-brand-DEFAULT text-brand-dark bg-brand-light' : 'border-transparent text-slate-700 hover:text-brand-dark hover:bg-slate-100 hover:border-slate-300'} whitespace-nowrap py-3 px-4 border-b-2 font-semibold text-sm transition-colors rounded-t-md`}
+                    className={`${activeTab === 'stats' ? 'border-blue-700 text-blue-800 bg-brand-light' : 'border-transparent text-blue-700 bg-brand-light'} whitespace-nowrap py-3 px-4 border-b-2 font-semibold text-sm transition-colors rounded-t-md`}
                 >
                     Descriptive Stats
                 </button>
                 <button
                     onClick={() => setActiveTab('plots')}
-                    className={`${activeTab === 'plots' ? 'border-brand-DEFAULT text-brand-dark bg-brand-light' : 'border-transparent text-slate-700 hover:text-brand-dark hover:bg-slate-100 hover:border-slate-300'} whitespace-nowrap py-3 px-4 border-b-2 font-semibold text-sm transition-colors rounded-t-md`}
+                    className={`${activeTab === 'plots' ? 'border-blue-700 text-blue-800 bg-brand-light' : 'border-transparent text-blue-700 bg-brand-light'} whitespace-nowrap py-3 px-4 border-b-2 font-semibold text-sm transition-colors rounded-t-md`}
                 >
                     Distribution Plots
                 </button>
                 <button
                     onClick={() => setActiveTab('ols')}
-                    className={`${activeTab === 'ols' ? 'border-brand-DEFAULT text-brand-dark bg-brand-light' : 'border-transparent text-slate-700 hover:text-brand-dark hover:bg-slate-100 hover:border-slate-300'} whitespace-nowrap py-3 px-4 border-b-2 font-semibold text-sm transition-colors rounded-t-md`}
+                    className={`${activeTab === 'ols' ? 'border-blue-700 text-blue-800 bg-brand-light' : 'border-transparent text-blue-700 bg-brand-light'} whitespace-nowrap py-3 px-4 border-b-2 font-semibold text-sm transition-colors rounded-t-md`}
                 >
                     OLS Models
                 </button>
@@ -107,9 +109,9 @@ const AnalysisStep: React.FC<AnalysisStepProps> = ({ sessionToken, cleanedData }
         }
 
         switch(activeTab) {
-            case 'stats': return <DescriptiveStatsView stats={stats} />;
+            case 'stats': return <DescriptiveStatsView stats={stats} sessionToken={sessionToken} />;
             case 'plots': return <PlotsView plots={plots} />;
-            case 'ols': return <OlsView models={olsModels} activeModel={activeOlsModel} setActiveModel={setActiveOlsModel} />;
+            case 'ols': return <OlsView models={olsModels} activeModel={activeOlsModel} setActiveModel={setActiveOlsModel} sessionToken={sessionToken} />;
             default: return null;
         }
     };
@@ -155,11 +157,52 @@ const AnalysisStep: React.FC<AnalysisStepProps> = ({ sessionToken, cleanedData }
     );
 };
 
-const DescriptiveStatsView: React.FC<{ stats: DescriptiveStats }> = ({ stats }) => (
+const DescriptiveStatsView: React.FC<{ stats: DescriptiveStats; sessionToken: string }> = ({ stats, sessionToken }) => {
+    const handleExportPDF = () => {
+        const doc = new jsPDF();
+
+        // Title
+        doc.setFontSize(18);
+        doc.text('Descriptive Statistics Report', 14, 20);
+
+        // Date
+        doc.setFontSize(10);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+
+        // Prepare table data
+        const tableData = Object.entries(stats).map(([variable, data]) => {
+            const statData = data as DescriptiveStats[string];
+            return [
+                variable,
+                statData.mean.toFixed(2),
+                statData.median.toFixed(2),
+                statData.std_dev.toFixed(2),
+                statData.min.toFixed(2),
+                statData.max.toFixed(2),
+                statData.skewness.toFixed(2),
+                statData.kurtosis.toFixed(2),
+                statData.outliers_count.toString()
+            ];
+        });
+
+        // Generate table
+        autoTable(doc, {
+            head: [['Variable', 'Mean', 'Median', 'Std. Dev.', 'Min', 'Max', 'Skewness', 'Kurtosis', 'Outliers']],
+            body: tableData,
+            startY: 35,
+            theme: 'grid',
+            headStyles: { fillColor: [128, 128, 128] }
+        });
+
+        // Save PDF
+        doc.save(`descriptive_stats_${sessionToken.slice(0, 8)}.pdf`);
+    };
+
+    return (
     <div>
         <div className="flex justify-between items-center mb-4">
             <h3 className="text-lg font-semibold">Descriptive Statistics</h3>
-            <Button variant="secondary" icon={<DownloadIcon className="w-4 h-4" />}>Export PDF</Button>
+            <Button variant="secondary" icon={<DownloadIcon className="w-4 h-4" />} onClick={handleExportPDF}>Export PDF</Button>
         </div>
         <Table headers={['Variable', 'Mean', 'Median', 'Std. Dev.', 'Min', 'Max', 'Skewness', 'Kurtosis', 'Outliers']}>
             {/* FIX: Cast `data` to its correct type to resolve properties being on `unknown`. */}
@@ -182,7 +225,8 @@ const DescriptiveStatsView: React.FC<{ stats: DescriptiveStats }> = ({ stats }) 
             })}
         </Table>
     </div>
-);
+    );
+};
 
 
 const PlotsView: React.FC<{ plots: PlotResponse | null }> = ({ plots }) => {
@@ -203,7 +247,6 @@ const PlotsView: React.FC<{ plots: PlotResponse | null }> = ({ plots }) => {
         <div>
             <div className="flex justify-between items-center mb-4">
                 <h3 className="text-lg font-semibold">Distribution Plots</h3>
-                <Button variant="secondary" icon={<DownloadIcon className="w-4 h-4" />}>Export PDF</Button>
             </div>
             {plots ? (
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -247,7 +290,74 @@ const PlotsView: React.FC<{ plots: PlotResponse | null }> = ({ plots }) => {
 };
 
 
-const OlsView: React.FC<{ models: OlsResult[], activeModel: OlsResult | null, setActiveModel: (model: OlsResult) => void }> = ({ models, activeModel, setActiveModel }) => (
+const OlsView: React.FC<{ models: OlsResult[], activeModel: OlsResult | null, setActiveModel: (model: OlsResult) => void, sessionToken: string }> = ({ models, activeModel, setActiveModel, sessionToken }) => {
+    const handleExportPDF = () => {
+        if (!activeModel) return;
+
+        const doc = new jsPDF();
+
+        // Title
+        doc.setFontSize(18);
+        doc.text(`OLS Regression Results: ${activeModel.model_name}`, 14, 20);
+
+        // Date
+        doc.setFontSize(10);
+        doc.text(`Generated: ${new Date().toLocaleString()}`, 14, 28);
+
+        // Model Summary
+        doc.setFontSize(12);
+        doc.text('Model Summary:', 14, 40);
+        doc.setFontSize(10);
+        doc.text(`R-squared: ${activeModel.r_squared.toFixed(4)}`, 14, 48);
+        doc.text(`Adj. R-squared: ${activeModel.adj_r_squared.toFixed(4)}`, 14, 54);
+        doc.text(`F-statistic: ${activeModel.f_statistic.toFixed(4)}`, 14, 60);
+        doc.text(`F-statistic p-value: ${activeModel.f_p_value.toFixed(6)}`, 14, 66);
+
+        let yPosition = 74;
+
+        // Warnings
+        if (activeModel.warnings.length > 0) {
+            doc.setFontSize(12);
+            doc.text('Warnings:', 14, yPosition);
+            yPosition += 6;
+            doc.setFontSize(10);
+            activeModel.warnings.forEach(warning => {
+                const lines = doc.splitTextToSize(`• ${warning}`, 180);
+                doc.text(lines, 14, yPosition);
+                yPosition += lines.length * 5;
+            });
+            yPosition += 4;
+        }
+
+        // Coefficients table
+        doc.setFontSize(12);
+        doc.text('Coefficients:', 14, yPosition);
+        yPosition += 8;
+
+        const tableData = Object.entries(activeModel.coefficients).map(([variable, data]) => {
+            const coeffData = data as OlsResult['coefficients'][string];
+            return [
+                variable,
+                coeffData.coefficient.toFixed(4),
+                coeffData.std_error.toFixed(4),
+                coeffData.t_statistic.toFixed(3),
+                coeffData.p_value.toFixed(4)
+            ];
+        });
+
+        autoTable(doc, {
+            head: [['Variable', 'Coefficient', 'Std. Error', 't-statistic', 'P>|t|']],
+            body: tableData,
+            startY: yPosition,
+            theme: 'grid',
+            headStyles: { fillColor: [128, 128, 128] }
+        });
+
+        // Save PDF
+        doc.save(`${activeModel.model_name}_${sessionToken.slice(0, 8)}.pdf`);
+    };
+
+    return (
     <div className="flex gap-6">
         <div className="w-1/4">
             <h4 className="font-semibold mb-2">Models Run</h4>
@@ -266,7 +376,7 @@ const OlsView: React.FC<{ models: OlsResult[], activeModel: OlsResult | null, se
                 <div>
                      <div className="flex justify-between items-center mb-4">
                         <h3 className="text-lg font-semibold">{activeModel.model_name} Results</h3>
-                        <Button variant="secondary" icon={<DownloadIcon className="w-4 h-4" />}>Export PDF</Button>
+                        <Button variant="secondary" icon={<DownloadIcon className="w-4 h-4" />} onClick={handleExportPDF}>Export PDF</Button>
                     </div>
                     {activeModel.warnings.length > 0 && (
                         <div className="p-4 mb-4 bg-red-50 border border-red-200 rounded-md text-red-800 flex items-start">
@@ -307,6 +417,7 @@ const OlsView: React.FC<{ models: OlsResult[], activeModel: OlsResult | null, se
             ) : <p className="text-slate-500">No model selected or run yet.</p>}
         </div>
     </div>
-);
+    );
+};
 
 export default AnalysisStep;

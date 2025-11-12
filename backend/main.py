@@ -1,6 +1,6 @@
 from fastapi import FastAPI, UploadFile, File, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from pydantic import BaseModel
 import pandas as pd
 import numpy as np
@@ -15,6 +15,11 @@ import base64
 from typing import Dict, List, Any, Optional
 import uuid
 from datetime import datetime
+from reportlab.lib import colors
+from reportlab.lib.pagesizes import letter, A4
+from reportlab.platypus import SimpleDocTemplate, Table, TableStyle, Paragraph, Spacer, Image, PageBreak
+from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
+from reportlab.lib.units import inch
 
 app = FastAPI(title="OLS Analysis Studio API")
 
@@ -30,6 +35,7 @@ app.add_middleware(
 # In-memory storage for sessions
 sessions: Dict[str, pd.DataFrame] = {}
 cleaned_sessions: Dict[str, pd.DataFrame] = {}
+analysis_results: Dict[str, Dict[str, Any]] = {}  # Store analysis results per session
 
 # Pydantic models
 class CleaningDecisions(BaseModel):
@@ -186,6 +192,11 @@ async def get_descriptive_stats(session_token: str, request: DescriptiveStatsReq
             "outliers_count": len(outliers)
         }
 
+    # Store results
+    if session_token not in analysis_results:
+        analysis_results[session_token] = {}
+    analysis_results[session_token]['stats'] = stats_result
+
     return stats_result
 
 
@@ -246,6 +257,11 @@ async def generate_plots(session_token: str, request: PlotRequest):
 
         plot_urls.append(f"data:image/png;base64,{image_base64}")
 
+    # Store results
+    if session_token not in analysis_results:
+        analysis_results[session_token] = {}
+    analysis_results[session_token]['plots'] = plot_urls
+
     return {"plot_urls": plot_urls}
 
 
@@ -299,7 +315,7 @@ async def run_ols_analysis(session_token: str, request: OLSRequest):
     except:
         pass
 
-    return {
+    result = {
         "model_name": request.model_name,
         "coefficients": coefficients,
         "r_squared": float(results.rsquared),
@@ -309,6 +325,167 @@ async def run_ols_analysis(session_token: str, request: OLSRequest):
         "warnings": warnings
     }
 
+    # Store results
+    if session_token not in analysis_results:
+        analysis_results[session_token] = {}
+    if 'ols_models' not in analysis_results[session_token]:
+        analysis_results[session_token]['ols_models'] = []
+    analysis_results[session_token]['ols_models'].append(result)
+
+    return result
+
+
+@app.get("/export/stats/{session_token}")
+async def export_stats_pdf(session_token: str):
+    """Export descriptive statistics as PDF."""
+    if session_token not in analysis_results or 'stats' not in analysis_results[session_token]:
+        raise HTTPException(status_code=404, detail="No statistics found for this session")
+
+    stats = analysis_results[session_token]['stats']
+
+    # Create PDF
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    story = []
+    styles = getSampleStyleSheet()
+
+    # Title
+    title = Paragraph("Descriptive Statistics Report", styles['Title'])
+    story.append(title)
+    story.append(Spacer(1, 0.3 * inch))
+
+    # Add generation date
+    date_text = Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal'])
+    story.append(date_text)
+    story.append(Spacer(1, 0.3 * inch))
+
+    # Create table data
+    table_data = [['Variable', 'Mean', 'Median', 'Std. Dev.', 'Min', 'Max', 'Skewness', 'Kurtosis', 'Outliers']]
+
+    for var, data in stats.items():
+        table_data.append([
+            var,
+            f"{data['mean']:.2f}",
+            f"{data['median']:.2f}",
+            f"{data['std_dev']:.2f}",
+            f"{data['min']:.2f}",
+            f"{data['max']:.2f}",
+            f"{data['skewness']:.2f}",
+            f"{data['kurtosis']:.2f}",
+            str(data['outliers_count'])
+        ])
+
+    # Create table
+    table = Table(table_data)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+
+    story.append(table)
+    doc.build(story)
+
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename=descriptive_stats_{session_token[:8]}.pdf"}
+    )
+
+
+@app.get("/export/ols/{session_token}/{model_name}")
+async def export_ols_pdf(session_token: str, model_name: str):
+    """Export OLS model results as PDF."""
+    if session_token not in analysis_results or 'ols_models' not in analysis_results[session_token]:
+        raise HTTPException(status_code=404, detail="No OLS models found for this session")
+
+    # Find the specific model
+    model = None
+    for m in analysis_results[session_token]['ols_models']:
+        if m['model_name'] == model_name:
+            model = m
+            break
+
+    if not model:
+        raise HTTPException(status_code=404, detail=f"Model {model_name} not found")
+
+    # Create PDF
+    buffer = io.BytesIO()
+    doc = SimpleDocTemplate(buffer, pagesize=letter)
+    story = []
+    styles = getSampleStyleSheet()
+
+    # Title
+    title = Paragraph(f"OLS Regression Results: {model_name}", styles['Title'])
+    story.append(title)
+    story.append(Spacer(1, 0.3 * inch))
+
+    # Add generation date
+    date_text = Paragraph(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}", styles['Normal'])
+    story.append(date_text)
+    story.append(Spacer(1, 0.3 * inch))
+
+    # Model Summary
+    summary_text = f"""
+    <b>Model Summary:</b><br/>
+    R-squared: {model['r_squared']:.4f}<br/>
+    Adj. R-squared: {model['adj_r_squared']:.4f}<br/>
+    F-statistic: {model['f_statistic']:.4f}<br/>
+    F-statistic p-value: {model['f_p_value']:.6f}
+    """
+    story.append(Paragraph(summary_text, styles['Normal']))
+    story.append(Spacer(1, 0.3 * inch))
+
+    # Warnings
+    if model['warnings']:
+        story.append(Paragraph("<b>Warnings:</b>", styles['Heading2']))
+        for warning in model['warnings']:
+            story.append(Paragraph(f"• {warning}", styles['Normal']))
+        story.append(Spacer(1, 0.3 * inch))
+
+    # Coefficients table
+    story.append(Paragraph("<b>Coefficients:</b>", styles['Heading2']))
+    story.append(Spacer(1, 0.2 * inch))
+
+    table_data = [['Variable', 'Coefficient', 'Std. Error', 't-statistic', 'P>|t|']]
+
+    for var, data in model['coefficients'].items():
+        table_data.append([
+            var,
+            f"{data['coefficient']:.4f}",
+            f"{data['std_error']:.4f}",
+            f"{data['t_statistic']:.3f}",
+            f"{data['p_value']:.4f}"
+        ])
+
+    table = Table(table_data)
+    table.setStyle(TableStyle([
+        ('BACKGROUND', (0, 0), (-1, 0), colors.grey),
+        ('TEXTCOLOR', (0, 0), (-1, 0), colors.whitesmoke),
+        ('ALIGN', (0, 0), (-1, -1), 'CENTER'),
+        ('FONTNAME', (0, 0), (-1, 0), 'Helvetica-Bold'),
+        ('FONTSIZE', (0, 0), (-1, 0), 12),
+        ('BOTTOMPADDING', (0, 0), (-1, 0), 12),
+        ('BACKGROUND', (0, 1), (-1, -1), colors.beige),
+        ('GRID', (0, 0), (-1, -1), 1, colors.black)
+    ]))
+
+    story.append(table)
+    doc.build(story)
+
+    buffer.seek(0)
+    return StreamingResponse(
+        buffer,
+        media_type="application/pdf",
+        headers={"Content-Disposition": f"attachment; filename={model_name}_{session_token[:8]}.pdf"}
+    )
+
 
 @app.delete("/session/{session_token}")
 async def end_session(session_token: str):
@@ -317,6 +494,8 @@ async def end_session(session_token: str):
         del sessions[session_token]
     if session_token in cleaned_sessions:
         del cleaned_sessions[session_token]
+    if session_token in analysis_results:
+        del analysis_results[session_token]
 
     return {"status": "Session deleted successfully"}
 
