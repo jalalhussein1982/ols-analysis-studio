@@ -2,7 +2,7 @@
 
 All notable changes to the OLS Analysis Studio project.
 
-## [2.0.0] - 2025-01-06
+## [2.0.0] - 2024-11-12
 
 ### 🎉 Major Architecture Change: FastAPI → PyScript
 
@@ -20,7 +20,7 @@ All notable changes to the OLS Analysis Studio project.
 
 ---
 
-## [1.5.0] - 2025-01-06
+## [1.5.0] - 2024-11-12
 
 ### 🎨 UI/UX Improvements
 
@@ -61,7 +61,7 @@ All notable changes to the OLS Analysis Studio project.
 
 ---
 
-## [1.4.0] - 2025-01-06
+## [1.4.0] - 2024-11-12
 
 ### 🐛 Bug Fixes
 
@@ -83,7 +83,7 @@ All notable changes to the OLS Analysis Studio project.
 
 ---
 
-## [1.3.0] - 2025-01-06
+## [1.3.0] - 2024-11-12
 
 ### 📝 Documentation
 
